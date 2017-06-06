@@ -51,8 +51,10 @@ public class CMinerAutorTest {
 		miner.generateFirstDs();		// 获取长度为1的频繁序列
 		
 		// 挖掘：频繁子序列
-		SubsequenceSuffix ss = miner.getSeqFromDs();
-		miner.candidateFreSubsequences(ss.getSubsequence(), ss.getOccurTimes());
+//		SubsequenceSuffix ss = miner.getSeqFromDs();
+//		miner.candidateFreSubsequences(ss.getSubsequence(), ss.getOccurTimes());
+		miner.myCandidateFreSubsequences();
+
 		
 		miner.closedFreSubsequences();	// 过滤：Closed频繁子序列
 		miner.generateRules();			// 生成：关联规则

@@ -8,6 +8,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import java.util.Stack;
+
+
 import org.apache.commons.lang.StringUtils;
 
 import cn.edu.zju.lau.cminer.model.hdfs.HDFSRule;
@@ -33,7 +36,10 @@ public class CMinerHDFS{
 	protected Map<String, Integer> freSubsequences;			// 候选频繁子序列，对应其出现的次数
 	protected Map<String, Integer> closedFreSubsequences;	// Closed频繁子序列
 	protected Map<String, HDFSRule> rules;					// 关联规则
-	protected Map<String, HDFSSubseqSuffix> Ds;				// 存储frequent subsequence在每个segments中的最长suffix
+	public Map<String, HDFSSubseqSuffix> Ds;				// 存储frequent subsequence在每个segments中的最长suffix
+
+	protected Stack<HDFSSubseqSuffix> stk;
+
 	
 	// 按候选频繁子序列的长度进行分层，相同长度的子序列存储在同一层中，例如：
 	//     freSubsequences: {abc=4, b=4, c=5, a=5, ac=5, ab=4, bc=4}
@@ -59,6 +65,8 @@ public class CMinerHDFS{
 		freSubsequencesTier = new HashMap<Integer, Map<String, Integer>>();
 		Ds = new HashMap<String, HDFSSubseqSuffix>();
 		
+		stk = new Stack<HDFSSubseqSuffix>();
+		
 		maxSeqLength = 0;
 	}
 	
@@ -79,6 +87,8 @@ public class CMinerHDFS{
 		rules = new HashMap<String, HDFSRule>();
 		freSubsequencesTier = new HashMap<Integer, Map<String, Integer>>();
 		Ds = new HashMap<String, HDFSSubseqSuffix>();
+
+		stk = new Stack<HDFSSubseqSuffix>();
 		
 		maxSeqLength = 0;
 	}
@@ -165,6 +175,9 @@ public class CMinerHDFS{
 			else{
 				Ds.get(entry.getKey()).setOccurTimes(entry.getValue());
 				Ds.get(entry.getKey()).setSubsequence(entry.getKey());
+
+				//
+				stk.push(Ds.get(entry.getKey()));
 			}
 		}
 	}
@@ -178,6 +191,103 @@ public class CMinerHDFS{
 		}
 		return Ds.entrySet().iterator().next().getValue();
 	}
+
+	/**
+	 * DFS 产生候选频繁子序列集合（Frequent Subsequences），满足：
+	 * 		1）相距不大于maxGap的访问子序列（没必要连续）
+	 * 		2）出现次数满足frequent要求，即不小于minSupport
+	 * 
+	 * 生成:	Map<String, Integer> freSubsequences
+	 * 		Map<Integer, Map<String, Integer>> freSubsequencesTier;
+	 */
+	public void myCandidateFreSubsequences( ){
+		while(!stk.empty( )){
+			HDFSSubseqSuffix cur = stk.pop();
+			String currentSubseq=cur.getSubsequence();
+			int occurTimes=cur.getOccurTimes();
+			
+			//System.out.println("DEBUG Pop " + currentSubseq + " from stack ");
+
+			
+			// 添加当前序列至 候选频繁子序列集合中
+			freSubsequences.put(currentSubseq, occurTimes);
+			
+			// 添加当前序列至 候选频发子序列对应的长度层次中
+			int seqLen = currentSubseq.split("\\|").length;
+			if(seqLen > maxSeqLength){
+				maxSeqLength = seqLen;
+			}
+			if(freSubsequencesTier.get(seqLen) == null){
+				freSubsequencesTier.put(seqLen, new HashMap<String, Integer>());
+			}
+			freSubsequencesTier.get(seqLen).put(currentSubseq, occurTimes);
+			
+			// 获取当前序列的后缀集合
+			Set<String> currentDs = Ds.get(currentSubseq).getSuffixes();
+			//
+			Ds.remove(currentSubseq);
+
+			// 从当前的后缀集合中计算出只包含一个访问序列的频繁子序列集合,存放了包含当前file的所有频繁files
+			Set<String> oneFileFreSubseqs = generateOneCharFreSubseq(currentDs);
+			
+			// 一次扫描每一个后缀集合中 只包含1个文件的频繁子序列
+			for(String file: oneFileFreSubseqs){
+				String[] currentSubseq_split=currentSubseq.split("\\|");
+				// 类似AA这种不检测
+				if(currentSubseq_split[currentSubseq_split.length-1].equalsIgnoreCase(file)){
+					continue;
+				}
+				
+				// 检测 currentSubseq连接file是否为frequent subsequence，同时，记录file有效出现时的新suffix
+				String newSeq = currentSubseq + "|" + file;
+				Set<String> newDs = new HashSet<String>();
+				int cnt = 0;
+				
+				for(String suffix: currentDs){
+					if(suffix.contains(file)){
+						String[] suffixFiles = suffix.split("\\|");
+						
+						for(int i = 0; i < suffixFiles.length && i <= maxGap; i++){
+							if(i == suffixFiles.length - 1){
+								cnt++;
+							}
+							else if(suffixFiles[i].equalsIgnoreCase(file)){
+								cnt++;
+								newDs.add(suffix.substring(suffix.indexOf(suffixFiles[i + 1])));
+								break;
+							}
+							else{
+								//
+							}
+						}
+					}
+				}
+				
+				// 对于达到minSupport的新序列，递归调用
+				if(cnt >= minSupport){
+					HDFSSubseqSuffix newSubseqSuffix=new HDFSSubseqSuffix(newSeq, cnt, newDs);
+					Ds.put(newSeq, newSubseqSuffix);
+					stk.push(newSubseqSuffix);
+					// 处理完毕，从Ds中移除
+					//Ds.remove(currentSubseq);
+					//candidateFreSubsequences(newSeq, newDs.size() + endCount);
+
+					//System.out.println("DEBUG push " + newSeq+ " into stack ");
+				}
+			}
+			
+			// 处理完毕，从Ds中移除
+			//Ds.remove(currentSubseq);
+			
+			// 继续处理下一个
+			//HDFSSubseqSuffix nextSeq = getSeqFromDs();
+			//if(nextSeq != null){
+			//	candidateFreSubsequences(nextSeq.getSubsequence(), nextSeq.getOccurTimes());
+			//}
+		}
+	}
+
+
 	
 	/**
 	 * DFS 产生候选频繁子序列集合（Frequent Subsequences），满足：

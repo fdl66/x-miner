@@ -4,9 +4,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import cn.edu.zju.lau.cminer.impl.hdfs.CMinerHDFS;
 import cn.edu.zju.lau.cminer.model.hdfs.FileAccessLog;
@@ -20,7 +18,7 @@ import cn.edu.zju.lau.cminer.model.hdfs.HDFSSubseqSuffix;
  */
 public class CMinerHDFSTest {
 	
-	private static final String LOG_PATH = "D://audit.log";
+	private static final String LOG_PATH = "/home/dear/code/java/x-miner/data/trace_test";//"C://Users//MM//Desktop//x_miner//data//trace_test";
 	private static CMinerHDFS miner = new CMinerHDFS();
 	
 	public static void main(String[] args){
@@ -60,10 +58,11 @@ public class CMinerHDFSTest {
             reader = new BufferedReader(new FileReader(file));
             String logLine = null;
             while ((logLine = reader.readLine()) != null) {
-            	FileAccessLog log = FileAccessLog.parse(logLine);
-            	if(log.isValid()){
-            		logs.add(log.getSrc().split("/user/root/input/sogou/query-log-")[1]);
-            	}
+            	//FileAccessLog log = FileAccessLog.parse(logLine);
+            	//if(log.isValid()){
+            	//	logs.add(log.getSrc().split("/user/root/input/sogou/query-log-")[1]);
+            	//}
+            	logs.add(logLine);
             }
         } 
         catch (IOException ioe) {
@@ -89,13 +88,13 @@ public class CMinerHDFSTest {
 	public static void testByStep(String filePath){
 		
 		miner.setMinSupport(3);
-		miner.setWindowSize(26);
+		miner.setWindowSize(50);
 		
 		// 读取文件
 		List<String> logs = getLogs(filePath);
 		miner.setInputSequence(logs);
 		System.out.println("** input sequence:");
-		System.out.println(logs);
+//		System.out.println(logs);
 		System.out.println();
 		
 		// 对文件访问日志分段
@@ -105,19 +104,34 @@ public class CMinerHDFSTest {
 		for(int i = 0; i < segments.size(); i++){
 			List<String> segment = segments.get(i);
 			for(int j = 0; j < segment.size(); j++){
-				System.out.print(segment.get(j) + " ");
+//				System.out.print(segment.get(j) + " ");
 			}
-			System.out.print(", ");
+//			System.out.print(", ");
 		}
 		System.out.println();
 		
 		// 获取长度为1的频繁序列
 		miner.generateFirstDs();
 		// System.out.println(miner.getDs());
-		
+
+//		System.out.println(miner.Ds.size());
+//        Set debug_set=miner.Ds.keySet();
+//
+//        for(Iterator iter=debug_set.iterator();iter.hasNext();){
+//            String key = (String)iter.next();
+//            HDFSSubseqSuffix values=miner.Ds.get(key);
+//            Set<String> suf=values.getSuffixes();
+//            System.out.println(key+"*******************************************");
+//            for (Iterator<String> iterstring=suf.iterator();iterstring.hasNext();){
+//                System.out.println(iterstring.next());
+//            }
+//        }
+
 		// 挖掘：频繁子序列
-		HDFSSubseqSuffix ss = miner.getSeqFromDs();
-		miner.candidateFreSubsequences(ss.getSubsequence(), ss.getOccurTimes());
+//		HDFSSubseqSuffix ss = miner.getSeqFromDs();
+//		miner.candidateFreSubsequences(ss.getSubsequence(), ss.getOccurTimes());
+		miner.myCandidateFreSubsequences();
+
 		System.out.println("** frequent subsequences:");
 		System.out.println(miner.getFreSubsequences());
 
